@@ -228,6 +228,8 @@ Allows you to use the same firewall appliances for Inbound, Outbound, and East-W
 
 Making On-Prem and Cloud resolve each other's hostnames.
 
+For comprehensive guidance on implementing hybrid cloud DNS architecture with Route 53 Resolver endpoints, see [Hybrid Cloud DNS Options for Amazon VPC](./AWS_Hybrid_Cloud_DNS_Options.md).
+
 ### Route 53 Resolver Endpoints
 
 #### Outbound Endpoint
@@ -252,7 +254,7 @@ Sits in a VPC and listens for queries from on-premise (via VPN/DX) to resolve `a
 
 Use the default VPC Resolver (VPC+2 IP address) for high availability and scalability. This is automatically available in every VPC and provides DNS resolution for AWS services and public domains.
 
-For detailed information, see [AWS Route 53 Resolver](./AWS_Route_53_Resolver.md).
+For detailed information on Route 53 Resolver functionality, see [AWS Route 53 Resolver](./AWS_Route_53_Resolver.md).
 
 ## 8. Centralized Access to VPC Private Endpoints
 
@@ -322,3 +324,4 @@ For additional implementation guidance and best practices:
 - **[AWS Global Infrastructure](./AWS_Global_Infrastructure.md)** - Foundational infrastructure components
 - **[AWS PrivateLink](./AWS_PrivateLink.md)** - VPC Endpoints and private connectivity
 - **[AWS Route 53 Resolver](./AWS_Route_53_Resolver.md)** - DNS resolution and hybrid DNS
+- **[Hybrid Cloud DNS Options for Amazon VPC](./AWS_Hybrid_Cloud_DNS_Options.md)** - Well-architected hybrid DNS architecture implementation

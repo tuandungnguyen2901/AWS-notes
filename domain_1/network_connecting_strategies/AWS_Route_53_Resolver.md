@@ -46,3 +46,7 @@ Management of DNS Firewall policies can be centralized using AWS Firewall Manage
 ## Naming Context
 
 The service was previously known simply as Route 53 Resolver, but the name was updated to **VPC Resolver** following the introduction of Route 53 Global Resolver. Understanding these hybrid DNS concepts, including the functions of the VPC Resolver and on-premises DNS integration, is a necessary area of knowledge for designing network connectivity strategies, as covered in the AWS Certified Solutions Architect - Professional exam.
+
+## Related Resources
+
+For a comprehensive guide on implementing well-architected hybrid cloud DNS architecture with centralized endpoints, cost optimization, and best practices, see [Hybrid Cloud DNS Options for Amazon VPC](./AWS_Hybrid_Cloud_DNS_Options.md).

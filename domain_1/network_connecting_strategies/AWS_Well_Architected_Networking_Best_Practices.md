@@ -139,5 +139,6 @@ For detailed information on specific networking topics covered in this best prac
 - **[AWS Network Connectivity Options](./AWS_Network_Connectivity_Options.md)** - Comprehensive connectivity strategies including VPC Peering, Transit Gateway, Cloud WAN, Direct Connect, Site-to-Site VPN, and Disaster Recovery networking
 - **[AWS PrivateLink](./AWS_PrivateLink.md)** - Detailed configuration and implementation guide for VPC Endpoints and PrivateLink
 - **[AWS Route 53 Resolver](./AWS_Route_53_Resolver.md)** - DNS resolution within VPCs and hybrid DNS connectivity
+- **[Hybrid Cloud DNS Options for Amazon VPC](./AWS_Hybrid_Cloud_DNS_Options.md)** - Well-architected hybrid DNS architecture implementation
 - **[AWS Client VPN Configuration](./AWS_Client_VPN_Configuration.md)** - Remote access VPN solutions
 - **[Building a Scalable and Secure Multi-VPC AWS Network Infrastructure](./AWS_Multi_VPC_Network_Infrastructure.md)** - Comprehensive guide for architecting multi-VPC networks with multi-account strategy, layered security, and resilience
