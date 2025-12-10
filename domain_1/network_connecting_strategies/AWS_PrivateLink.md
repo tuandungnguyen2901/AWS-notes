@@ -2,6 +2,22 @@
 
 AWS PrivateLink is a foundational networking service that simplifies the security of data sharing with cloud-based applications by keeping data exposure off the public internet. It establishes private connectivity between Virtual Private Clouds (VPCs), AWS services, and on-premises applications, operating securely on the Amazon network. This capability is instrumental in enabling the connection of services across different accounts and VPCs while substantially simplifying network architecture.
 
+## Architecture Design
+
+The following diagram illustrates a typical AWS PrivateLink architecture using a VPC Gateway Endpoint for Amazon S3, demonstrating how private instances can securely access S3 buckets without traversing the public internet:
+
+![AWS PrivateLink Architecture](../images/AWSPrivateLink.png)
+
+**Key Architectural Components:**
+
+- **VPC with Public and Private Subnets**: The VPC contains both public and private subnets, allowing for secure network segmentation.
+- **Public Instance**: Acts as a bastion/jump server in the public subnet with internet access via an Internet Gateway.
+- **Private Instance**: Resides in the private subnet without direct internet access, ensuring enhanced security.
+- **VPC Gateway Endpoint for S3**: Provides a direct, private connection from the private instance to the S3 bucket, ensuring traffic remains within the AWS network and never traverses the public internet.
+- **Security Groups**: Applied to both instances to control inbound and outbound traffic at the instance level.
+
+This architecture ensures that sensitive data stored in S3, when accessed by the private instance, never leaves the Amazon network, significantly enhancing security and compliance.
+
 ## Core Configuration using VPC Endpoints
 
 PrivateLink powers the creation of VPC interface endpoints, which serve as private connection points within your virtual network. These endpoints function as a critical layer of security control, allowing private connections to supported AWS services without requiring an internet gateway, Network Address Translation (NAT) device, or VPN connection.
@@ -152,4 +168,7 @@ Be aware that PrivateLink is not free. You are billed on two dimensions:
 | Consumer | Create Endpoint | Enable Private DNS; Ensure Security Group allows Port 443 Inbound. |
 | Both | Network | Ensure VPC CIDRs do not overlap if using Peering (though PrivateLink tolerates overlap). |
 
-**Reference**: [Mastering AWS Private Link (VPC Endpoint Service)](https://www.youtube.com/watch?v=example) - This video provides a practical visual walkthrough of the endpoint service setup which often clarifies the "Whitelisting" step better than text does.
+## References
+
+- [Mastering AWS Private Link (VPC Endpoint Service)](https://www.youtube.com/watch?v=example) - This video provides a practical visual walkthrough of the endpoint service setup which often clarifies the "Whitelisting" step better than text does.
+- [Terraform AWS PrivateLink Example](https://github.com/shazChaudhry/terraform-aws-privateLink) - A Terraform implementation demonstrating how to provision infrastructure with VPC Gateway Endpoint for Amazon S3, including a VPC with public and private subnets, EC2 instances, and secure S3 access without internet traversal.
