@@ -74,7 +74,7 @@ How independent VPCs communicate within the AWS Cloud.
 - Deploy a TGW attachment in every Availability Zone (AZ) used by the VPC, as traffic cannot route cross-AZ to the attachment.
 - Use separate route tables for different environments (Production, Development, Shared Services) to enforce segmentation.
 
-For more details, see [AWS Network Connectivity Options](./AWS_Network_Connectivity_Options.md).
+For more details, see [AWS Network Connectivity Options](./AWS_Network_Connectivity_Options.md). For cross-Region VPC connectivity using Transit Gateway, see [Interconnecting VPCs Across AWS Regions Using Transit Gateway](./AWS_Transit_Gateway_Cross_Region.md).
 
 ### AWS PrivateLink
 
@@ -325,3 +325,4 @@ For additional implementation guidance and best practices:
 - **[AWS PrivateLink](./AWS_PrivateLink.md)** - VPC Endpoints and private connectivity
 - **[AWS Route 53 Resolver](./AWS_Route_53_Resolver.md)** - DNS resolution and hybrid DNS
 - **[Hybrid Cloud DNS Options for Amazon VPC](./AWS_Hybrid_Cloud_DNS_Options.md)** - Well-architected hybrid DNS architecture implementation
+- **[Interconnecting VPCs Across AWS Regions Using Transit Gateway](./AWS_Transit_Gateway_Cross_Region.md)** - Cross-Region VPC connectivity via Transit Gateway
