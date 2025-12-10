@@ -47,7 +47,7 @@ A Region is a physical, geographically separated location around the world where
 ### Edge Locations
 
 - Functioning as Points of Presence (PoPs) → closer to user.
-- Route53 → CloudFront Cache + Lambda@Edge code execution
+- [Route 53 Resolver](./AWS_Route_53_Resolver.md) → CloudFront Cache + Lambda@Edge code execution
 
 ### Regional Edge Caches
 
@@ -115,6 +115,7 @@ A Region is a physical, geographically separated location around the world where
 **Amazon Route 53**
 - Scalable DNS service that routes users to internet applications running on AWS.
 - Utilizes health checks and routing policies to ensure traffic goes to the nearest or healthiest endpoint in the infrastructure.
+- See [Route 53 Resolver (VPC Resolver)](./AWS_Route_53_Resolver.md) for DNS resolution within VPCs and hybrid DNS connectivity.
 
 ### Security and Governance
 
