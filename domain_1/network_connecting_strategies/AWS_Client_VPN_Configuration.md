@@ -22,7 +22,7 @@ AWS Client VPN is deployed as part of the overarching AWS Virtual Private Networ
 
 Both of these VPN solutions establish encrypted network connectivity to a VPC over the internet using IPSec. If you require larger bandwidth, certain VPN configurations attached to Transit Gateway or AWS Cloud WAN can support up to 5 Gbps bandwidth per tunnel, compared to the standard 1.25 Gbps.
 
-AWS Client VPN relies on VPC components like a route table to direct network traffic. Since the goal of a VPN solution is to allow private communication, you can leverage Amazon VPC endpoints for private connectivity to supported AWS services without using the public internet.
+AWS Client VPN relies on VPC components like a route table to direct network traffic. Since the goal of a VPN solution is to allow private communication, you can leverage [Amazon VPC endpoints](./AWS_PrivateLink.md) for private connectivity to supported AWS services without using the public internet.
 
 ## Related Resources
 
