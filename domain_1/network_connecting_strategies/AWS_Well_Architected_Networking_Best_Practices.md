@@ -140,3 +140,4 @@ For detailed information on specific networking topics covered in this best prac
 - **[AWS PrivateLink](./AWS_PrivateLink.md)** - Detailed configuration and implementation guide for VPC Endpoints and PrivateLink
 - **[AWS Route 53 Resolver](./AWS_Route_53_Resolver.md)** - DNS resolution within VPCs and hybrid DNS connectivity
 - **[AWS Client VPN Configuration](./AWS_Client_VPN_Configuration.md)** - Remote access VPN solutions
+- **[Building a Scalable and Secure Multi-VPC AWS Network Infrastructure](./AWS_Multi_VPC_Network_Infrastructure.md)** - Comprehensive guide for architecting multi-VPC networks with multi-account strategy, layered security, and resilience
