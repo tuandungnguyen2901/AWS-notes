@@ -101,9 +101,24 @@ class Neo4jClient:
     
     def clear_database(self):
         """Clear all nodes and relationships from the database"""
+        # First, get counts before deletion
+        count_query = "MATCH (n) RETURN count(n) as node_count"
+        rel_count_query = "MATCH ()-[r]->() RETURN count(r) as rel_count"
+        
+        try:
+            node_count_result = self.execute_query(count_query)
+            rel_count_result = self.execute_query(rel_count_query)
+            node_count = node_count_result[0]['node_count'] if node_count_result else 0
+            rel_count = rel_count_result[0]['rel_count'] if rel_count_result else 0
+            
+            logger.info(f"Found {node_count} nodes and {rel_count} relationships to delete")
+        except Exception as e:
+            logger.warning(f"Could not get counts before deletion: {e}")
+        
+        # Delete all nodes and relationships
         query = "MATCH (n) DETACH DELETE n"
         self.execute_write(query)
-        logger.info("Database cleared")
+        logger.info("✓ All nodes and relationships deleted from database")
     
     def __enter__(self):
         """Context manager entry"""

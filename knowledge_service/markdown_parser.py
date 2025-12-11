@@ -161,3 +161,21 @@ class MarkdownParser:
                     references.append(ref)
         
         return references
+    
+    def extract_first_line(self, content: str) -> Optional[str]:
+        """
+        Extract the first non-empty line of text (for kg-gen processing)
+        
+        Args:
+            content: Markdown content string
+            
+        Returns:
+            First non-empty line or None
+        """
+        lines = content.split('\n')
+        for line in lines:
+            stripped = line.strip()
+            # Skip empty lines, markdown headers, and code blocks
+            if stripped and not stripped.startswith('#') and not stripped.startswith('```'):
+                return stripped
+        return None

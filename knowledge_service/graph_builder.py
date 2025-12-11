@@ -4,8 +4,10 @@ Uses parameterized queries for safety and proper handling of special characters
 """
 
 from typing import List, Dict, Optional, Tuple
+from pathlib import Path
 from .markdown_parser import Document, Section
 from .concept_extractor import Concept
+from .kg_gen_extractor import KGGenEntity, KGGenRelation
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,123 @@ class GraphBuilder:
             neo4j_client: Neo4jClient instance
         """
         self.client = neo4j_client
+    
+    def parse_folder_structure(self, file_path: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Parse folder structure to extract domain and category
+        
+        Args:
+            file_path: Path to the document (e.g., "domain_1/network_connecting_strategies/AWS_PrivateLink.md")
+            
+        Returns:
+            Tuple of (domain_name, category_name) or (None, None) if structure doesn't match
+        """
+        path_parts = Path(file_path).parts
+        
+        # Expected structure: domain_X/category_name/document.md
+        if len(path_parts) >= 2:
+            domain_name = path_parts[0]  # e.g., "domain_1"
+            category_name = path_parts[1]  # e.g., "network_connecting_strategies"
+            return domain_name, category_name
+        
+        return None, None
+    
+    def create_domain_node(self, domain_name: str) -> Tuple[str, Dict]:
+        """
+        Create a Domain node
+        
+        Args:
+            domain_name: Name of the domain (e.g., "domain_1")
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        query = """
+        MERGE (dom:Domain {name: $name})
+        RETURN dom
+        """
+        params = {
+            'name': domain_name
+        }
+        return query, params
+    
+    def create_category_node(self, category_name: str, domain_name: str) -> Tuple[str, Dict]:
+        """
+        Create a Category node
+        
+        Args:
+            category_name: Name of the category (e.g., "network_connecting_strategies")
+            domain_name: Name of the parent domain
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        # Use domain_name:category_name as unique identifier
+        category_id = f"{domain_name}:{category_name}"
+        
+        query = """
+        MERGE (cat:Category {id: $id})
+        SET cat.name = $name,
+            cat.domain = $domain
+        RETURN cat
+        """
+        params = {
+            'id': category_id,
+            'name': category_name,
+            'domain': domain_name
+        }
+        return query, params
+    
+    def create_domain_category_relationship(self, domain_name: str, category_name: str) -> Tuple[str, Dict]:
+        """
+        Create CONTAINS relationship (Domain -> Category)
+        
+        Args:
+            domain_name: Name of the domain
+            category_name: Name of the category
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        category_id = f"{domain_name}:{category_name}"
+        
+        query = """
+        MATCH (dom:Domain {name: $domain_name})
+        MATCH (cat:Category {id: $category_id})
+        MERGE (dom)-[:CONTAINS]->(cat)
+        RETURN dom, cat
+        """
+        params = {
+            'domain_name': domain_name,
+            'category_id': category_id
+        }
+        return query, params
+    
+    def create_category_document_relationship(self, category_name: str, domain_name: str, document_path: str) -> Tuple[str, Dict]:
+        """
+        Create CONTAINS relationship (Category -> Document)
+        
+        Args:
+            category_name: Name of the category
+            domain_name: Name of the domain
+            document_path: Path to the document
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        category_id = f"{domain_name}:{category_name}"
+        
+        query = """
+        MATCH (cat:Category {id: $category_id})
+        MATCH (d:Document {file_path: $file_path})
+        MERGE (cat)-[:CONTAINS]->(d)
+        RETURN cat, d
+        """
+        params = {
+            'category_id': category_id,
+            'file_path': document_path
+        }
+        return query, params
     
     def create_document_node(self, document: Document) -> Tuple[str, Dict]:
         """
@@ -226,7 +345,83 @@ class GraphBuilder:
         }
         return query, params
     
-    def import_document(self, document: Document, concepts: List[Concept], relationships: List[tuple]) -> None:
+    def create_kg_gen_entity_node(self, entity: KGGenEntity, document_path: str) -> Tuple[str, Dict]:
+        """
+        Create a KGGenEntity node (from kg-gen extraction)
+        
+        Args:
+            entity: KGGenEntity object
+            document_path: Path to the document that contains this entity
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        query = """
+        MERGE (e:KGGenEntity {name: $name})
+        SET e.type = $type,
+            e.description = $description,
+            e.source_document = $source_document
+        RETURN e
+        """
+        params = {
+            'name': entity.name,
+            'type': entity.type,
+            'description': (entity.description or "")[:500],
+            'source_document': document_path
+        }
+        return query, params
+    
+    def create_kg_gen_relation(self, relation: KGGenRelation) -> Tuple[str, Dict]:
+        """
+        Create a relationship from kg-gen extraction
+        
+        Args:
+            relation: KGGenRelation object
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        # Validate relationship type
+        rel_type = relation.relation_type.replace(' ', '_').upper()
+        if not rel_type.replace('_', '').isalnum():
+            rel_type = "RELATES_TO"
+        
+        query = f"""
+        MATCH (e1:KGGenEntity {{name: $source}})
+        MATCH (e2:KGGenEntity {{name: $target}})
+        MERGE (e1)-[:{rel_type}]->(e2)
+        RETURN e1, e2
+        """
+        params = {
+            'source': relation.source,
+            'target': relation.target
+        }
+        return query, params
+    
+    def create_document_kg_gen_relationship(self, document_path: str, entity_name: str) -> Tuple[str, Dict]:
+        """
+        Create relationship between Document and KGGenEntity
+        
+        Args:
+            document_path: Path to the document
+            entity_name: Name of the kg-gen entity
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        query = """
+        MATCH (d:Document {file_path: $file_path})
+        MATCH (e:KGGenEntity {name: $entity_name})
+        MERGE (d)-[:EXTRACTS]->(e)
+        RETURN d, e
+        """
+        params = {
+            'file_path': document_path,
+            'entity_name': entity_name
+        }
+        return query, params
+    
+    def import_document(self, document: Document, concepts: List[Concept], relationships: List[tuple], kg_gen_entities: Optional[List[KGGenEntity]] = None, kg_gen_relations: Optional[List[KGGenRelation]] = None) -> None:
         """
         Import a complete document with all its relationships
         
@@ -234,15 +429,41 @@ class GraphBuilder:
             document: Document object
             concepts: List of extracted concepts
             relationships: List of (source, rel_type, target) tuples
+            kg_gen_entities: Optional list of kg-gen extracted entities
+            kg_gen_relations: Optional list of kg-gen extracted relations
         """
         queries = []
+        
+        # Parse folder structure to get domain and category
+        domain_name, category_name = self.parse_folder_structure(document.file_path)
+        
+        # Create domain and category nodes if structure is present
+        if domain_name and category_name:
+            queries.append(self.create_domain_node(domain_name))
+            queries.append(self.create_category_node(category_name, domain_name))
+            queries.append(self.create_domain_category_relationship(domain_name, category_name))
         
         # Create document node
         queries.append(self.create_document_node(document))
         
+        # Link document to category if structure is present
+        if domain_name and category_name:
+            queries.append(self.create_category_document_relationship(category_name, domain_name, document.file_path))
+        
         # Create concept nodes
         for concept in concepts:
             queries.append(self.create_concept_node(concept))
+        
+        # Create kg-gen entity nodes
+        if kg_gen_entities:
+            for entity in kg_gen_entities:
+                queries.append(self.create_kg_gen_entity_node(entity, document.file_path))
+                queries.append(self.create_document_kg_gen_relationship(document.file_path, entity.name))
+        
+        # Create kg-gen relations
+        if kg_gen_relations:
+            for relation in kg_gen_relations:
+                queries.append(self.create_kg_gen_relation(relation))
         
         # Create section nodes
         for section in document.sections:
