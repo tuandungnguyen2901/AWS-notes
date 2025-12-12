@@ -120,6 +120,78 @@ class Neo4jClient:
         self.execute_write(query)
         logger.info("✓ All nodes and relationships deleted from database")
     
+    def clear_domain(self, domain_name: str):
+        """
+        Clear all data related to a specific domain
+        
+        Args:
+            domain_name: Name of the domain to clear (e.g., 'domain_1_Design_Solutions_for_Organizational_Complexity')
+        """
+        # First, check if domain exists and get counts
+        check_query = """
+        MATCH (dom:Domain {name: $domain_name})
+        OPTIONAL MATCH (dom)-[:CONTAINS]->(cat:Category)
+        OPTIONAL MATCH (cat)-[:CONTAINS]->(doc:Document)
+        OPTIONAL MATCH (doc)-[:CONTAINS]->(sec:Section)
+        RETURN 
+            count(DISTINCT dom) as domain_count,
+            count(DISTINCT cat) as category_count,
+            count(DISTINCT doc) as document_count,
+            count(DISTINCT sec) as section_count
+        """
+        
+        try:
+            result = self.execute_query(check_query, {'domain_name': domain_name})
+            if result and result[0]['domain_count'] > 0:
+                counts = result[0]
+                logger.info(f"Found domain '{domain_name}' with:")
+                logger.info(f"  - {counts['category_count']} categories")
+                logger.info(f"  - {counts['document_count']} documents")
+                logger.info(f"  - {counts['section_count']} sections")
+            else:
+                logger.warning(f"Domain '{domain_name}' not found in database")
+                return
+        except Exception as e:
+            logger.warning(f"Could not get domain counts: {e}")
+        
+        # Delete in order: Sections -> Documents -> Categories -> Domain
+        # Also delete related concepts and relationships
+        delete_query = """
+        MATCH (dom:Domain {name: $domain_name})
+        OPTIONAL MATCH (dom)-[:CONTAINS]->(cat:Category)
+        OPTIONAL MATCH (cat)-[:CONTAINS]->(doc:Document)
+        OPTIONAL MATCH (doc)-[:CONTAINS]->(sec:Section)
+        OPTIONAL MATCH (doc)-[:DOCUMENTS]->(concept:Concept)
+        OPTIONAL MATCH (doc)-[:EXTRACTS]->(kgEntity:KGGenEntity)
+        OPTIONAL MATCH (sec)-[:MENTIONS]->(concept2:Concept)
+        
+        // Delete sections first
+        DETACH DELETE sec
+        
+        // Delete documents and their relationships
+        DETACH DELETE doc
+        
+        // Delete categories
+        DETACH DELETE cat
+        
+        // Delete domain
+        DETACH DELETE dom
+        
+        // Note: Concepts and KGGenEntities are kept if they're referenced by other documents
+        RETURN count(dom) as deleted_domains
+        """
+        
+        try:
+            result = self.execute_write(delete_query, {'domain_name': domain_name})
+            deleted = result[0]['deleted_domains'] if result else 0
+            if deleted > 0:
+                logger.info(f"✓ Successfully deleted domain '{domain_name}' and all related data")
+            else:
+                logger.warning(f"No data was deleted for domain '{domain_name}'")
+        except Exception as e:
+            logger.error(f"Error deleting domain '{domain_name}': {e}")
+            raise
+    
     def __enter__(self):
         """Context manager entry"""
         self.connect()

@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import logging
 
 from knowledge_service import KnowledgeImporter
+from knowledge_service.config import ExtractionConfig
 
 # Load environment variables from .env file
 load_dotenv()
@@ -73,6 +74,12 @@ def main():
         action='store_true',
         help='Skip confirmation prompt (use with caution!)'
     )
+    clear_parser.add_argument(
+        '--domain',
+        type=str,
+        default=None,
+        help='Clear only a specific domain (e.g., domain_1_Design_Solutions_for_Organizational_Complexity). If not specified, clears all data.'
+    )
     
     # Import command
     import_parser = subparsers.add_parser('import', help='Import knowledge files')
@@ -128,6 +135,58 @@ def main():
         action='store_true',
         help='Disable kg-gen extraction'
     )
+    import_parser.add_argument(
+        '--schema-mode',
+        type=str,
+        choices=['strict', 'legacy'],
+        default=os.getenv('KG_SCHEMA_MODE', 'legacy'),
+        help='Schema mode: strict (new schema) or legacy (old schema). Default: legacy'
+    )
+    import_parser.add_argument(
+        '--normalize',
+        action='store_true',
+        default=os.getenv('KG_ENABLE_NORMALIZATION', 'false').lower() == 'true',
+        help='Enable entity normalization (default: from KG_ENABLE_NORMALIZATION env var)'
+    )
+    import_parser.add_argument(
+        '--no-normalize',
+        action='store_true',
+        help='Disable entity normalization'
+    )
+    import_parser.add_argument(
+        '--validate',
+        action='store_true',
+        default=os.getenv('KG_ENABLE_VALIDATION', 'false').lower() == 'true',
+        help='Enable triple validation (default: from KG_ENABLE_VALIDATION env var)'
+    )
+    import_parser.add_argument(
+        '--no-validate',
+        action='store_true',
+        help='Disable triple validation'
+    )
+    import_parser.add_argument(
+        '--cluster',
+        action='store_true',
+        default=os.getenv('KG_ENABLE_CLUSTERING', 'false').lower() == 'true',
+        help='Enable entity clustering (default: from KG_ENABLE_CLUSTERING env var)'
+    )
+    import_parser.add_argument(
+        '--no-cluster',
+        action='store_true',
+        help='Disable entity clustering'
+    )
+    import_parser.add_argument(
+        '--incremental',
+        action='store_true',
+        default=os.getenv('KG_ENABLE_INCREMENTAL', 'false').lower() == 'true',
+        help='Enable incremental update mode (default: from KG_ENABLE_INCREMENTAL env var)'
+    )
+    import_parser.add_argument(
+        '--similarity-threshold',
+        type=float,
+        default=float(os.getenv('KG_SIMILARITY_THRESHOLD', '0.75')),
+        help='Similarity threshold for entity normalization (default: 0.75, from KG_SIMILARITY_THRESHOLD env var)'
+    )
     
     args = parser.parse_args()
     
@@ -147,7 +206,10 @@ def main():
         # Confirmation prompt
         if not args.confirm:
             print("\n" + "="*60)
-            print("WARNING: This will DELETE ALL DATA from the Neo4j database!")
+            if args.domain:
+                print(f"WARNING: This will DELETE all data for domain '{args.domain}'!")
+            else:
+                print("WARNING: This will DELETE ALL DATA from the Neo4j database!")
             print("="*60)
             response = input(f"Are you sure you want to clear database '{args.database}'? (yes/no): ")
             if response.lower() not in ['yes', 'y']:
@@ -165,9 +227,14 @@ def main():
             )
             
             with client:
-                logger.info("Clearing all data from Neo4j database...")
-                client.clear_database()
-                logger.info("✓ Database cleared successfully")
+                if args.domain:
+                    logger.info(f"Clearing domain '{args.domain}' from Neo4j database...")
+                    client.clear_domain(args.domain)
+                    logger.info("✓ Domain cleared successfully")
+                else:
+                    logger.info("Clearing all data from Neo4j database...")
+                    client.clear_database()
+                    logger.info("✓ Database cleared successfully")
             
         except KeyboardInterrupt:
             logger.info("\nClear operation interrupted by user")
@@ -216,7 +283,20 @@ def main():
             print(f"Successfully imported: {stats['successful']}")
             print(f"Failed: {stats['failed']}")
             print(f"Documents created: {stats['documents_created']}")
-            print(f"Concepts created: {stats['concepts_created']}")
+            if 'concepts_created' in stats:
+                print(f"Concepts created: {stats['concepts_created']}")
+            if 'chunks_processed' in stats:
+                print(f"Chunks processed: {stats['chunks_processed']}")
+            if 'triples_extracted' in stats:
+                print(f"Triples extracted: {stats['triples_extracted']}")
+            if 'triples_normalized' in stats:
+                print(f"Triples normalized: {stats['triples_normalized']}")
+            if 'triples_validated' in stats:
+                print(f"Triples validated: {stats['triples_validated']}")
+            if 'triples_merged' in stats:
+                print(f"Triples merged: {stats['triples_merged']}")
+            if 'triples_stored' in stats:
+                print(f"Triples stored: {stats['triples_stored']}")
             if 'kg_gen_entities_created' in stats:
                 print(f"KG-gen entities created: {stats['kg_gen_entities_created']}")
             

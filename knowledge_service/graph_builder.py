@@ -8,6 +8,7 @@ from pathlib import Path
 from .markdown_parser import Document, Section
 from .concept_extractor import Concept
 from .kg_gen_extractor import KGGenEntity, KGGenRelation
+from .schema import Triple, EntityType, RelationType
 import logging
 
 logger = logging.getLogger(__name__)
@@ -420,6 +421,299 @@ class GraphBuilder:
             'entity_name': entity_name
         }
         return query, params
+    
+    # =====================================================================
+    # New Schema Methods - Entity Types
+    # =====================================================================
+    
+    def create_service_node(self, service_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Service node"""
+        query = """
+        MERGE (s:Service {name: $name})
+        SET s.description = $description
+        RETURN s
+        """
+        params = {
+            'name': service_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_component_node(self, component_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Component node"""
+        query = """
+        MERGE (c:Component {name: $name})
+        SET c.description = $description
+        RETURN c
+        """
+        params = {
+            'name': component_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_pattern_node(self, pattern_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Pattern node"""
+        query = """
+        MERGE (p:Pattern {name: $name})
+        SET p.description = $description
+        RETURN p
+        """
+        params = {
+            'name': pattern_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_pillar_node(self, pillar_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Pillar node"""
+        query = """
+        MERGE (p:Pillar {name: $name})
+        SET p.description = $description
+        RETURN p
+        """
+        params = {
+            'name': pillar_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_best_practice_node(self, practice_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a BestPractice node"""
+        query = """
+        MERGE (bp:BestPractice {name: $name})
+        SET bp.description = $description
+        RETURN bp
+        """
+        params = {
+            'name': practice_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_risk_node(self, risk_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Risk node"""
+        query = """
+        MERGE (r:Risk {name: $name})
+        SET r.description = $description
+        RETURN r
+        """
+        params = {
+            'name': risk_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_mitigation_node(self, mitigation_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Mitigation node"""
+        query = """
+        MERGE (m:Mitigation {name: $name})
+        SET m.description = $description
+        RETURN m
+        """
+        params = {
+            'name': mitigation_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_metric_node(self, metric_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Metric node"""
+        query = """
+        MERGE (m:Metric {name: $name})
+        SET m.description = $description
+        RETURN m
+        """
+        params = {
+            'name': metric_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_role_node(self, role_name: str, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create a Role node"""
+        query = """
+        MERGE (r:Role {name: $name})
+        SET r.description = $description
+        RETURN r
+        """
+        params = {
+            'name': role_name,
+            'description': description or ""
+        }
+        return query, params
+    
+    def create_typed_entity_node(self, entity_name: str, entity_type: EntityType, description: Optional[str] = None) -> Tuple[str, Dict]:
+        """
+        Create a typed entity node based on entity type
+        
+        Args:
+            entity_name: Entity name
+            entity_type: Entity type
+            description: Optional description
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        type_map = {
+            EntityType.SERVICE: self.create_service_node,
+            EntityType.COMPONENT: self.create_component_node,
+            EntityType.PATTERN: self.create_pattern_node,
+            EntityType.PILLAR: self.create_pillar_node,
+            EntityType.BEST_PRACTICE: self.create_best_practice_node,
+            EntityType.RISK: self.create_risk_node,
+            EntityType.MITIGATION: self.create_mitigation_node,
+            EntityType.METRIC: self.create_metric_node,
+            EntityType.ROLE: self.create_role_node
+        }
+        
+        creator = type_map.get(entity_type)
+        if creator:
+            return creator(entity_name, description)
+        else:
+            # Fallback to Concept node for unknown types
+            return self.create_concept_node(Concept(name=entity_name, type=entity_type.value, description=description))
+    
+    # =====================================================================
+    # New Schema Methods - Relations
+    # =====================================================================
+    
+    def create_uses_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create USES relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.USES, object_name, object_type, evidence)
+    
+    def create_implements_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create IMPLEMENTS relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.IMPLEMENTS, object_name, object_type, evidence)
+    
+    def create_addresses_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create ADDRESSES relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.ADDRESSES, object_name, object_type, evidence)
+    
+    def create_recommended_by_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create RECOMMENDED_BY relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.RECOMMENDED_BY, object_name, object_type, evidence)
+    
+    def create_affects_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create AFFECTS relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.AFFECTS, object_name, object_type, evidence)
+    
+    def create_depends_on_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create DEPENDS_ON relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.DEPENDS_ON, object_name, object_type, evidence)
+    
+    def create_violates_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create VIOLATES relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.VIOLATES, object_name, object_type, evidence)
+    
+    def create_example_of_relationship(self, subject_name: str, subject_type: EntityType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """Create EXAMPLE_OF relationship"""
+        return self._create_typed_relationship(subject_name, subject_type, RelationType.EXAMPLE_OF, object_name, object_type, evidence)
+    
+    def _create_typed_relationship(self, subject_name: str, subject_type: EntityType, relation: RelationType, object_name: str, object_type: EntityType, evidence: Optional[str] = None) -> Tuple[str, Dict]:
+        """
+        Create a typed relationship between entities
+        
+        Args:
+            subject_name: Subject entity name
+            subject_type: Subject entity type
+            relation: Relation type
+            object_name: Object entity name
+            object_type: Object entity type
+            evidence: Optional evidence text
+            
+        Returns:
+            Tuple of (query_string, parameters_dict)
+        """
+        # Get node labels
+        subject_label = self._entity_type_to_label(subject_type)
+        object_label = self._entity_type_to_label(object_type)
+        
+        # Validate relation type (Cypher doesn't allow parameterized relationship types)
+        rel_type = relation.value.upper().replace(' ', '_')
+        if not rel_type.replace('_', '').isalnum():
+            raise ValueError(f"Invalid relationship type: {rel_type}")
+        
+        query = f"""
+        MATCH (s:{subject_label} {{name: $subject_name}})
+        MATCH (o:{object_label} {{name: $object_name}})
+        MERGE (s)-[r:{rel_type}]->(o)
+        SET r.evidence = CASE 
+            WHEN r.evidence IS NULL THEN $evidence
+            ELSE r.evidence + ' | ' + $evidence
+        END
+        RETURN s, r, o
+        """
+        
+        params = {
+            'subject_name': subject_name,
+            'object_name': object_name,
+            'evidence': evidence or ''
+        }
+        
+        return query, params
+    
+    def _entity_type_to_label(self, entity_type: EntityType) -> str:
+        """Convert EntityType to Neo4j label"""
+        type_to_label = {
+            EntityType.SERVICE: "Service",
+            EntityType.COMPONENT: "Component",
+            EntityType.PATTERN: "Pattern",
+            EntityType.PILLAR: "Pillar",
+            EntityType.BEST_PRACTICE: "BestPractice",
+            EntityType.RISK: "Risk",
+            EntityType.MITIGATION: "Mitigation",
+            EntityType.METRIC: "Metric",
+            EntityType.ROLE: "Role",
+            EntityType.CONCEPT: "Concept",
+            EntityType.DOCUMENT: "Document",
+            EntityType.SECTION: "Section",
+            EntityType.DOMAIN: "Domain",
+            EntityType.CATEGORY: "Category"
+        }
+        return type_to_label.get(entity_type, "Concept")
+    
+    def import_triples(self, triples: List[Triple]) -> None:
+        """
+        Import triples using new schema
+        
+        Args:
+            triples: List of Triple objects to import
+        """
+        queries = []
+        
+        for triple in triples:
+            # Create subject node
+            queries.append(self.create_typed_entity_node(
+                triple.subject,
+                triple.subject_type,
+                None  # Description not in Triple, could be enhanced
+            ))
+            
+            # Create object node
+            queries.append(self.create_typed_entity_node(
+                triple.object,
+                triple.object_type,
+                None
+            ))
+            
+            # Create relationship
+            queries.append(self._create_typed_relationship(
+                triple.subject,
+                triple.subject_type,
+                triple.relation,
+                triple.object,
+                triple.object_type,
+                triple.evidence
+            ))
+        
+        # Execute all queries in batch
+        try:
+            self.client.execute_batch(queries)
+            logger.info(f"Imported {len(triples)} triples")
+        except Exception as e:
+            logger.error(f"Error importing triples: {e}")
+            raise
     
     def import_document(self, document: Document, concepts: List[Concept], relationships: List[tuple], kg_gen_entities: Optional[List[KGGenEntity]] = None, kg_gen_relations: Optional[List[KGGenRelation]] = None) -> None:
         """

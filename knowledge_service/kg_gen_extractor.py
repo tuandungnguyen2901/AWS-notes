@@ -3,8 +3,14 @@ KG-Gen Extractor - Use kg-gen library for first-line text extraction and node cr
 """
 
 import logging
+import json
+import re
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
+
+from .schema import Triple, EntityType, RelationType
+from .prompt_templates import get_template_manager
+from .chunk_processor import Chunk
 
 logger = logging.getLogger(__name__)
 
@@ -348,3 +354,246 @@ class KGGenExtractor:
             logger.debug(f"  Traceback:\n{traceback.format_exc()}")
             logger.error("=" * 60)
             return [], []
+    
+    def extract_from_chunk(self, chunk: Chunk, use_strict_prompt: bool = True) -> List[Triple]:
+        """
+        Extract triples from a chunk using strict schema-driven prompts
+        
+        Args:
+            chunk: Chunk object with text and metadata
+            use_strict_prompt: Whether to use strict schema prompt (default: True)
+            
+        Returns:
+            List of Triple objects
+        """
+        logger.debug("=" * 60)
+        logger.debug("KG-Gen extraction from chunk (strict mode)")
+        
+        if not chunk.text or not chunk.text.strip():
+            logger.warning("  Empty chunk text provided, skipping extraction")
+            return []
+        
+        try:
+            # Build prompt with strict template
+            template_manager = get_template_manager()
+            
+            if use_strict_prompt:
+                source_info = {
+                    'source': chunk.source,
+                    'section': chunk.section,
+                    'url': chunk.url
+                }
+                prompt = template_manager.build_prompt(
+                    chunk_text=chunk.text,
+                    source_info=source_info,
+                    template_name='well_architected'
+                )
+            else:
+                prompt = chunk.text
+            
+            logger.debug(f"  Calling kg-gen.generate() with strict prompt...")
+            logger.debug(f"  Chunk source: {chunk.source}")
+            logger.debug(f"  Chunk section: {chunk.section}")
+            
+            # Use kg-gen with strict prompt
+            graph = self.kg.generate(
+                input_data=prompt,
+                context="AWS knowledge extraction with strict schema"
+            )
+            
+            logger.debug(f"  ✓ kg-gen.generate() completed successfully")
+            
+            # Parse JSON output from kg-gen
+            triples = self._parse_json_triples(graph, chunk)
+            
+            logger.info(f"  ✓ Extracted {len(triples)} triples from chunk")
+            logger.debug("=" * 60)
+            return triples
+            
+        except Exception as e:
+            logger.error("=" * 60)
+            logger.error(f"  ✗ Error extracting triples from chunk: {e}")
+            logger.error(f"  Error type: {type(e).__name__}")
+            import traceback
+            logger.debug(f"  Traceback:\n{traceback.format_exc()}")
+            logger.error("=" * 60)
+            return []
+    
+    def _parse_json_triples(self, graph, chunk: Chunk) -> List[Triple]:
+        """
+        Parse JSON triple format from kg-gen output
+        
+        Args:
+            graph: kg-gen graph output
+            chunk: Source chunk for metadata
+            
+        Returns:
+            List of Triple objects
+        """
+        triples = []
+        
+        # Try to extract JSON from graph output
+        json_text = None
+        
+        # Check if graph has a text/response attribute
+        if hasattr(graph, 'text'):
+            json_text = graph.text
+        elif hasattr(graph, 'response'):
+            json_text = graph.response
+        elif isinstance(graph, str):
+            json_text = graph
+        elif hasattr(graph, '__dict__'):
+            # Try to find JSON in graph attributes
+            for attr in ['output', 'result', 'data', 'content']:
+                if hasattr(graph, attr):
+                    value = getattr(graph, attr)
+                    if isinstance(value, str):
+                        json_text = value
+                        break
+        
+        if not json_text:
+            logger.warning("  Could not find JSON text in kg-gen output")
+            logger.debug(f"  Graph type: {type(graph)}")
+            logger.debug(f"  Graph attributes: {[a for a in dir(graph) if not a.startswith('_')]}")
+            return []
+        
+        # Extract JSON array from text (handle markdown code blocks, etc.)
+        json_text = self._extract_json_from_text(json_text)
+        
+        if not json_text:
+            logger.warning("  Could not extract JSON from kg-gen output")
+            return []
+        
+        try:
+            # Parse JSON
+            data = json.loads(json_text)
+            
+            if not isinstance(data, list):
+                logger.warning(f"  Expected JSON array, got {type(data)}")
+                return []
+            
+            # Convert to Triple objects
+            for item in data:
+                try:
+                    triple = self._dict_to_triple(item, chunk)
+                    if triple:
+                        triples.append(triple)
+                except Exception as e:
+                    logger.warning(f"  Failed to parse triple: {e}")
+                    logger.debug(f"    Triple data: {item}")
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"  JSON decode error: {e}")
+            logger.debug(f"  JSON text: {json_text[:500]}")
+            return []
+        
+        return triples
+    
+    def _extract_json_from_text(self, text: str) -> Optional[str]:
+        """
+        Extract JSON array from text (handle code blocks, markdown, etc.)
+        
+        Args:
+            text: Text containing JSON
+            
+        Returns:
+            Extracted JSON string or None
+        """
+        # Try to find JSON array pattern
+        # Look for [...]
+        json_pattern = r'\[[\s\S]*?\]'
+        matches = re.finditer(json_pattern, text)
+        
+        for match in matches:
+            candidate = match.group(0)
+            try:
+                # Try to parse it
+                json.loads(candidate)
+                return candidate
+            except json.JSONDecodeError:
+                continue
+        
+        # If no array found, try to find any JSON object/array
+        # Remove markdown code block markers
+        text = re.sub(r'```json\s*', '', text)
+        text = re.sub(r'```\s*', '', text)
+        text = text.strip()
+        
+        # Try to parse the whole thing
+        try:
+            json.loads(text)
+            return text
+        except json.JSONDecodeError:
+            pass
+        
+        return None
+    
+    def _dict_to_triple(self, data: dict, chunk: Chunk) -> Optional[Triple]:
+        """
+        Convert dictionary to Triple object
+        
+        Args:
+            data: Dictionary with triple data
+            chunk: Source chunk for metadata
+            
+        Returns:
+            Triple object or None if invalid
+        """
+        try:
+            # Extract required fields
+            subject = data.get('subject', '').strip()
+            object_name = data.get('object', '').strip()  # 'object' is a keyword
+            
+            if not subject or not object_name:
+                logger.debug(f"  Missing subject or object in triple: {data}")
+                return None
+            
+            # Parse entity types
+            try:
+                subject_type = EntityType(data.get('subject_type', 'Service'))
+                object_type = EntityType(data.get('object_type', 'Service'))
+            except ValueError as e:
+                logger.warning(f"  Invalid entity type: {e}")
+                return None
+            
+            # Parse relation
+            try:
+                relation = RelationType(data.get('relation', 'uses'))
+            except ValueError:
+                # Try to normalize relation name
+                rel_name = data.get('relation', 'uses').lower().replace(' ', '_')
+                try:
+                    relation = RelationType(rel_name)
+                except ValueError:
+                    logger.warning(f"  Unknown relation type: {data.get('relation')}")
+                    return None
+            
+            # Extract evidence
+            evidence = data.get('evidence', '').strip()
+            if not evidence:
+                evidence = f"{subject} {relation.value} {object_name}"
+            
+            # Extract inferred flag
+            inferred = data.get('inferred', False)
+            
+            # Build triple
+            triple = Triple(
+                subject=subject,
+                subject_type=subject_type,
+                relation=relation,
+                object=object_name,
+                object_type=object_type,
+                evidence=evidence,
+                inferred=inferred,
+                source=chunk.source,
+                section=chunk.section,
+                url=chunk.url,
+                timestamp=chunk.metadata.get('created_at') if chunk.metadata else None
+            )
+            
+            return triple
+            
+        except Exception as e:
+            logger.warning(f"  Error converting dict to triple: {e}")
+            logger.debug(f"    Data: {data}")
+            return None
